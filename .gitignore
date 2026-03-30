@@ -32,9 +32,11 @@ build/
 # Data (keep structure, ignore content)
 data/*.db
 data/backups/*
+!data/backups/.gitkeep
 data/logs/*.log
 data/cache/*
-!data/.gitkeep
+!data/cache/.gitkeep
+!.gitkeep
 
 # Configs with secrets
 configs/secrets.yaml
