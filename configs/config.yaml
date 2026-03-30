@@ -1,0 +1,24 @@
+server:
+  port: 8080
+  mode: development
+  
+database:
+  type: sqlite
+  path: data/ai-k8s-ops.db
+  
+auth:
+  jwt_secret: "dev-secret-change-in-production"
+  jwt_expiry_hours: 24
+  
+ai:
+  provider: openai
+  api_key: ""
+  model: "gpt-4-turbo"
+  embedding_model: "text-embedding-ada-002"
+  
+monitor:
+  prometheus_retention_days: 15
+  
+log:
+  level: info
+  path: data/logs/server.log
