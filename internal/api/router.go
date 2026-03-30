@@ -9,6 +9,7 @@ import (
 	"github.com/your-org/ai-k8s-ops/internal/api/handlers"
 	"github.com/your-org/ai-k8s-ops/internal/api/middleware"
 	"github.com/your-org/ai-k8s-ops/internal/auth"
+	"github.com/your-org/ai-k8s-ops/internal/cluster"
 )
 
 func NewRouter() *gin.Engine {
@@ -40,6 +41,19 @@ func NewRouterWithDB(db *sql.DB, jwtSecret string, jwtExpiry time.Duration) *gin
 				{
 					protected.GET("/profile", authHandler.GetProfile)
 				}
+			}
+
+			clusterDB := cluster.NewClusterDB(db)
+			clusterHandler := handlers.NewClusterHandler(clusterDB)
+
+			clusterGroup := v1.Group("/clusters")
+			clusterGroup.Use(middleware.AuthMiddleware(jwtSecret))
+			{
+				clusterGroup.POST("", clusterHandler.CreateCluster)
+				clusterGroup.GET("", clusterHandler.ListClusters)
+				clusterGroup.GET("/:id", clusterHandler.GetCluster)
+				clusterGroup.PUT("/:id", clusterHandler.UpdateCluster)
+				clusterGroup.DELETE("/:id", clusterHandler.DeleteCluster)
 			}
 		}
 	}
