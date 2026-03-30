@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/your-org/ai-k8s-ops/internal/api"
@@ -30,9 +31,22 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	router := api.NewRouter()
+	jwtExpiry := time.Duration(cfg.Auth.JWTExpiryHours) * time.Hour
+
+	router := api.NewRouterWithDB(db, cfg.Auth.JWTSecret, jwtExpiry)
 	address := fmt.Sprintf(":%d", cfg.Server.Port)
 	log.Printf("Server starting on %s", address)
+	log.Printf("Available endpoints:")
+	log.Printf("  GET  /api/v1/system/health")
+	log.Printf("  GET  /api/v1/system/version")
+	log.Printf("  POST /api/v1/auth/register")
+	log.Printf("  POST /api/v1/auth/login")
+	log.Printf("  GET  /api/v1/auth/profile")
+	log.Printf("  POST /api/v1/clusters")
+	log.Printf("  GET  /api/v1/clusters")
+	log.Printf("  GET  /api/v1/clusters/:id")
+	log.Printf("  PUT  /api/v1/clusters/:id")
+	log.Printf("  DELETE /api/v1/clusters/:id")
 	if err := router.Run(address); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
