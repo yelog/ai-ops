@@ -33,7 +33,26 @@ npm run dev
 
 ## Development
 
-See [docs/plans/](docs/plans/) for detailed implementation plans.
+See [docs/development.md](docs/development.md) for detailed development guide.
+
+## Architecture
+
+See [docs/architecture.md](docs/architecture.md) for system architecture.
+
+## API Endpoints
+
+### System
+
+- `GET /api/v1/system/health` - Health check
+- `GET /api/v1/system/version` - Server version
+
+## Database Schema
+
+Database: SQLite (data/ai-k8s-ops.db)
+
+Tables: 13 (users, clusters, nodes, conversations, messages, knowledge_base, deployment_templates, deployments, alert_rules, alerts, remediations, backups, audit_logs)
+
+See [docs/architecture.md](docs/architecture.md) for detailed schema.
 
 ## License
 
