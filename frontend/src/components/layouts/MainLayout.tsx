@@ -24,7 +24,17 @@ const { Header, Sider, Content } = Layout
 const menuItems = [
   { key: '/', icon: <DashboardOutlined />, label: '仪表盘' },
   { key: '/clusters', icon: <ClusterOutlined />, label: '集群管理' },
-  { key: '/deploy', icon: <CloudUploadOutlined />, label: '部署中心' },
+  {
+    key: '/deploy',
+    icon: <CloudUploadOutlined />,
+    label: '部署中心',
+    children: [
+      { key: '/deploy', label: '概览' },
+      { key: '/deploy/templates', label: '部署模板' },
+      { key: '/deploy/tasks', label: '部署任务' },
+      { key: '/deploy/offline', label: '离线管理' },
+    ],
+  },
   { key: '/ai', icon: <RobotOutlined />, label: 'AI 助手' },
   { key: '/monitoring', icon: <MonitorOutlined />, label: '监控中心' },
   { key: '/alerts', icon: <AlertOutlined />, label: '告警中心' },

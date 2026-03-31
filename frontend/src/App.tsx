@@ -13,6 +13,7 @@ import DeployPage from '@/pages/Deploy'
 import TemplateListPage from '@/pages/Deploy/Templates'
 import TaskListPage from '@/pages/Deploy/Tasks'
 import AIPage from '@/pages/AI'
+import OfflinePage from '@/pages/Deploy/Offline'
 
 import './index.css'
 
@@ -39,6 +40,7 @@ function App() {
               <Route path="deploy" element={<DeployPage />} />
               <Route path="deploy/templates" element={<TemplateListPage />} />
               <Route path="deploy/tasks" element={<TaskListPage />} />
+              <Route path="deploy/offline" element={<OfflinePage />} />
               <Route path="ai" element={<AIPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

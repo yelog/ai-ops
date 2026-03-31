@@ -13,6 +13,7 @@ import (
 	"github.com/your-org/ai-k8s-ops/internal/cluster"
 	"github.com/your-org/ai-k8s-ops/internal/deploy"
 	"github.com/your-org/ai-k8s-ops/internal/llm"
+	"github.com/your-org/ai-k8s-ops/internal/offline"
 )
 
 func NewRouter() *gin.Engine {
@@ -80,6 +81,25 @@ func NewRouterWithDB(db *sql.DB, jwtSecret string, jwtExpiry time.Duration, aiCo
 				taskGroup.POST("", deployHandler.CreateTask)
 				taskGroup.GET("", deployHandler.ListTasks)
 				taskGroup.GET("/:id", deployHandler.GetTask)
+			}
+
+			offlineDB := offline.NewPackageDB(db)
+			offlineHandler := handlers.NewOfflineHandler(
+				offlineDB,
+				offline.NewExporter(offlineDB, "data/offline"),
+				offline.NewImporter(offlineDB, "data/offline"),
+			)
+
+			offlineGroup := v1.Group("/offline")
+			offlineGroup.Use(middleware.AuthMiddleware(jwtSecret))
+			{
+				offlineGroup.GET("/resources", offlineHandler.GetResources)
+				offlineGroup.POST("/packages/export", offlineHandler.ExportPackage)
+				offlineGroup.POST("/packages/import", offlineHandler.ImportPackage)
+				offlineGroup.GET("/packages", offlineHandler.ListPackages)
+				offlineGroup.GET("/packages/:id", offlineHandler.GetPackage)
+				offlineGroup.DELETE("/packages/:id", offlineHandler.DeletePackage)
+				offlineGroup.GET("/packages/:id/download", offlineHandler.DownloadPackage)
 			}
 
 			if aiConfig != nil && aiConfig.APIKey != "" {

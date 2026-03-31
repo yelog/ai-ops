@@ -214,5 +214,23 @@ CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id
 CREATE INDEX IF NOT EXISTS idx_deployments_status ON deployments(status);
 CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_time ON audit_logs(created_at);
+
+CREATE TABLE IF NOT EXISTS offline_packages (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    version TEXT NOT NULL,
+    os_list TEXT NOT NULL,
+    modules TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    size INTEGER DEFAULT 0,
+    checksum TEXT,
+    storage_path TEXT,
+    error_message TEXT,
+    created_by TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_offline_packages_status ON offline_packages(status);
 `
 }
