@@ -1,3 +1,7 @@
+---
+render_with_liquid: false
+---
+
 # Phase 1 Week 7-8: Deployment Feature Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.

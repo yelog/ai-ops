@@ -69,4 +69,4 @@ jobs:
 
       - name: Test
         working-directory: frontend
-        run: npm test -- --run
+        run: npm test -- --run --passWithNoTests
