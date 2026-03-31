@@ -30,7 +30,7 @@ func setupClusterTestServer(t *testing.T) (*gin.Engine, *auth.UserDB, *cluster.C
 
 	userDB := auth.NewUserDB(db)
 	clusterDB := cluster.NewClusterDB(db)
-	router := api.NewRouterWithDB(db, "test-secret", 24*time.Hour)
+	router := api.NewRouterWithDB(db, "test-secret", 24*time.Hour, nil)
 
 	cleanup := func() {
 		db.Close()

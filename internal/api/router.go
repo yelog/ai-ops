@@ -6,18 +6,20 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/your-org/ai-k8s-ops/internal/ai"
 	"github.com/your-org/ai-k8s-ops/internal/api/handlers"
 	"github.com/your-org/ai-k8s-ops/internal/api/middleware"
 	"github.com/your-org/ai-k8s-ops/internal/auth"
 	"github.com/your-org/ai-k8s-ops/internal/cluster"
 	"github.com/your-org/ai-k8s-ops/internal/deploy"
+	"github.com/your-org/ai-k8s-ops/internal/llm"
 )
 
 func NewRouter() *gin.Engine {
-	return NewRouterWithDB(nil, "dev-secret-key", 24*time.Hour)
+	return NewRouterWithDB(nil, "dev-secret-key", 24*time.Hour, nil)
 }
 
-func NewRouterWithDB(db *sql.DB, jwtSecret string, jwtExpiry time.Duration) *gin.Engine {
+func NewRouterWithDB(db *sql.DB, jwtSecret string, jwtExpiry time.Duration, aiConfig *AIConfig) *gin.Engine {
 	router := gin.Default()
 
 	v1 := router.Group("/api/v1")
@@ -79,8 +81,31 @@ func NewRouterWithDB(db *sql.DB, jwtSecret string, jwtExpiry time.Duration) *gin
 				taskGroup.GET("", deployHandler.ListTasks)
 				taskGroup.GET("/:id", deployHandler.GetTask)
 			}
+
+			if aiConfig != nil && aiConfig.APIKey != "" {
+				aiHandler := handlers.NewAIHandler(
+					ai.NewConversationDB(db),
+					ai.NewMessageDB(db),
+					llm.NewClient(aiConfig.APIKey, aiConfig.Model),
+				)
+
+				aiGroup := v1.Group("/ai")
+				aiGroup.Use(middleware.AuthMiddleware(jwtSecret))
+				{
+					aiGroup.POST("/conversations", aiHandler.CreateConversation)
+					aiGroup.GET("/conversations", aiHandler.ListConversations)
+					aiGroup.GET("/conversations/:id", aiHandler.GetConversation)
+					aiGroup.DELETE("/conversations/:id", aiHandler.DeleteConversation)
+					aiGroup.POST("/chat", aiHandler.Chat)
+				}
+			}
 		}
 	}
 
 	return router
+}
+
+type AIConfig struct {
+	APIKey string
+	Model  string
 }

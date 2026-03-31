@@ -27,7 +27,7 @@ func setupTestServer(t *testing.T) (*gin.Engine, *auth.UserDB, func()) {
 	}
 
 	userDB := auth.NewUserDB(db)
-	router := api.NewRouterWithDB(db, "test-secret-key", 24*time.Hour)
+	router := api.NewRouterWithDB(db, "test-secret-key", 24*time.Hour, nil)
 
 	cleanup := func() {
 		db.Close()
