@@ -1,0 +1,245 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v1.0.0 or v1.0.0-beta.0)"
+        required: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Determine release type
+        id: release_type
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          PRERELEASE="false"
+          if [[ "$TAG" =~ -(beta|alpha|rc)\.[0-9]+$ ]]; then
+            PRERELEASE="true"
+            echo "Detected pre-release tag: $TAG"
+          fi
+          echo "is_prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Build Go binaries
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          VERSION="${TAG#v}"
+          BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+          LDFLAGS="-s -w \
+            -X github.com/your-org/ai-k8s-ops/pkg/version.Version=${VERSION} \
+            -X github.com/your-org/ai-k8s-ops/pkg/version.BuildTime=${BUILD_TIME} \
+            -X github.com/your-org/ai-k8s-ops/pkg/version.GitCommit=${GIT_COMMIT}"
+
+          echo "Building for $GOOS/$GOARCH with version=$VERSION commit=$GIT_COMMIT"
+
+          go build -ldflags "$LDFLAGS" -o bin/server cmd/server/main.go
+          go build -ldflags "$LDFLAGS" -o bin/ai-k8s-ops cmd/cli/main.go
+
+      - name: Package release archive
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          VERSION="${TAG#v}"
+          OS="${{ matrix.goos }}"
+          ARCH="${{ matrix.goarch }}"
+          ARCHIVE_NAME="ai-k8s-ops-${VERSION}-${OS}-${ARCH}"
+
+          mkdir -p "${ARCHIVE_NAME}/bin"
+          mkdir -p "${ARCHIVE_NAME}/configs"
+          mkdir -p "${ARCHIVE_NAME}/scripts"
+
+          # Copy binaries
+          cp bin/server "${ARCHIVE_NAME}/bin/"
+          cp bin/ai-k8s-ops "${ARCHIVE_NAME}/bin/"
+
+          # Copy frontend dist
+          cp -r frontend/dist "${ARCHIVE_NAME}/frontend-dist"
+
+          # Copy config example
+          cp configs/config.example.yaml "${ARCHIVE_NAME}/configs/"
+
+          # Copy scripts
+          if [ -d scripts/offline ]; then
+            cp -r scripts/offline "${ARCHIVE_NAME}/scripts/"
+          fi
+
+          # Copy README
+          if [ -f README.md ]; then
+            cp README.md "${ARCHIVE_NAME}/"
+          fi
+
+          # Create tarball
+          tar -czf "${ARCHIVE_NAME}.tar.gz" "${ARCHIVE_NAME}"
+
+          # Generate checksum
+          sha256sum "${ARCHIVE_NAME}.tar.gz" > "${ARCHIVE_NAME}.tar.gz.sha256"
+
+          echo "archive_name=${ARCHIVE_NAME}" >> "$GITHUB_ENV"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-k8s-ops-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            *.tar.gz
+            *.tar.gz.sha256
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Determine release type
+        id: release_type
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          PRERELEASE="false"
+          if [[ "$TAG" =~ -(beta|alpha|rc)\.[0-9]+$ ]]; then
+            PRERELEASE="true"
+          fi
+          echo "is_prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Extract changelog for release notes
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.tag }}"
+          VERSION="${VERSION#v}"
+
+          if [ -f CHANGELOG.md ]; then
+            changelog_body=$(python3 << 'PYTHON'
+          import re, sys
+
+          version = "$VERSION"
+          try:
+              with open('CHANGELOG.md', 'r', encoding='utf-8') as f:
+                  content = f.read()
+          except Exception:
+              sys.exit(0)
+
+          pattern = rf'## \[{re.escape(version)}\] - \d{{4}}-\d{{2}}-\d{{2}}\n(.*?)(?=\n## \[|$)'
+          match = re.search(pattern, content, re.DOTALL)
+          if not match:
+              sys.exit(0)
+
+          section = match.group(1).strip()
+          if section:
+              print(section)
+          PYTHON
+            )
+            if [ -n "$changelog_body" ]; then
+              echo "$changelog_body" > /tmp/release_notes.md
+              echo "has_notes=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "has_notes=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "has_notes=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: List release assets
+        run: |
+          echo "Release assets:"
+          ls -la dist/
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          PRERELEASE_FLAG=""
+          if [ "${{ steps.release_type.outputs.is_prerelease }}" == "true" ]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+
+          if [ "${{ steps.changelog.outputs.has_notes }}" == "true" ]; then
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --notes-file /tmp/release_notes.md \
+              $PRERELEASE_FLAG \
+              dist/*.tar.gz \
+              dist/*.sha256
+          else
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --generate-notes \
+              $PRERELEASE_FLAG \
+              dist/*.tar.gz \
+              dist/*.sha256
+          fi
