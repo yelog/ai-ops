@@ -24,9 +24,12 @@ func NewExporter(packageDB *PackageDB, outputDir string) *Exporter {
 	return &Exporter{packageDB: packageDB, outputDir: outputDir}
 }
 
-// Export runs the full export pipeline in background
-func (e *Exporter) Export(pkg *OfflinePackage) {
-	go func() {
+// Export runs the full export pipeline
+// If sync is true, runs synchronously (for CLI); otherwise runs in background (for API)
+func (e *Exporter) Export(pkg *OfflinePackage, sync ...bool) {
+	synchronous := len(sync) > 0 && sync[0]
+
+	runExport := func() {
 		err := e.packageDB.UpdateStatus(pkg.ID, "exporting", "")
 		if err != nil {
 			log.Printf("Failed to update status for %s: %v", pkg.ID, err)
@@ -38,7 +41,14 @@ func (e *Exporter) Export(pkg *OfflinePackage) {
 			e.packageDB.UpdateStatus(pkg.ID, "failed", err.Error())
 			return
 		}
-	}()
+		log.Printf("Export completed for %s", pkg.ID)
+	}
+
+	if synchronous {
+		runExport()
+	} else {
+		go runExport()
+	}
 }
 
 func (e *Exporter) doExport(pkg *OfflinePackage) error {

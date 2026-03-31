@@ -11,7 +11,6 @@ import (
 	"github.com/your-org/ai-k8s-ops/internal/api/middleware"
 	"github.com/your-org/ai-k8s-ops/internal/auth"
 	"github.com/your-org/ai-k8s-ops/internal/cluster"
-	"github.com/your-org/ai-k8s-ops/internal/deploy"
 	"github.com/your-org/ai-k8s-ops/internal/llm"
 	"github.com/your-org/ai-k8s-ops/internal/offline"
 )
@@ -60,28 +59,7 @@ func NewRouterWithDB(db *sql.DB, jwtSecret string, jwtExpiry time.Duration, aiCo
 				clusterGroup.DELETE("/:id", clusterHandler.DeleteCluster)
 			}
 
-			deployHandler := handlers.NewDeployHandler(
-				deploy.NewTemplateDB(db),
-				deploy.NewTaskDB(db),
-			)
-
-			templateGroup := v1.Group("/deploy/templates")
-			templateGroup.Use(middleware.AuthMiddleware(jwtSecret))
-			{
-				templateGroup.POST("", deployHandler.CreateTemplate)
-				templateGroup.GET("", deployHandler.ListTemplates)
-				templateGroup.GET("/:id", deployHandler.GetTemplate)
-				templateGroup.PUT("/:id", deployHandler.UpdateTemplate)
-				templateGroup.DELETE("/:id", deployHandler.DeleteTemplate)
-			}
-
-			taskGroup := v1.Group("/deploy/tasks")
-			taskGroup.Use(middleware.AuthMiddleware(jwtSecret))
-			{
-				taskGroup.POST("", deployHandler.CreateTask)
-				taskGroup.GET("", deployHandler.ListTasks)
-				taskGroup.GET("/:id", deployHandler.GetTask)
-			}
+			// Template and task endpoints removed - using new deployer API
 
 			offlineDB := offline.NewPackageDB(db)
 			offlineHandler := handlers.NewOfflineHandler(
@@ -100,6 +78,17 @@ func NewRouterWithDB(db *sql.DB, jwtSecret string, jwtExpiry time.Duration, aiCo
 				offlineGroup.GET("/packages/:id", offlineHandler.GetPackage)
 				offlineGroup.DELETE("/packages/:id", offlineHandler.DeletePackage)
 				offlineGroup.GET("/packages/:id/download", offlineHandler.DownloadPackage)
+			}
+
+			deployerHandler := handlers.NewDeployerHandler()
+
+			deployGroup := v1.Group("/deploy")
+			deployGroup.Use(middleware.AuthMiddleware(jwtSecret))
+			{
+				deployGroup.POST("", deployerHandler.DeployCluster)
+				deployGroup.GET("", deployerHandler.ListDeployments)
+				deployGroup.GET("/:id", deployerHandler.GetDeploymentStatus)
+				deployGroup.POST("/offline", deployerHandler.DeployOfflinePackage)
 			}
 
 			if aiConfig != nil && aiConfig.APIKey != "" {

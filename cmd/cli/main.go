@@ -138,9 +138,10 @@ func handleExport() {
 	fmt.Println()
 
 	// Run export synchronously for CLI
-	exporter.Export(pkg)
+	fmt.Println("Starting export (this may take several minutes)...")
+	exporter.Export(pkg, true) // sync=true for CLI
 
-	fmt.Println("Export started. Check status with: ai-k8s-ops offline list")
+	fmt.Println("Export completed! Check status with: ai-k8s-ops offline list")
 }
 
 func handleImport() {
