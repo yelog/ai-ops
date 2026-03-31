@@ -10,6 +10,7 @@ import (
 	"github.com/your-org/ai-k8s-ops/internal/api/middleware"
 	"github.com/your-org/ai-k8s-ops/internal/auth"
 	"github.com/your-org/ai-k8s-ops/internal/cluster"
+	"github.com/your-org/ai-k8s-ops/internal/deploy"
 )
 
 func NewRouter() *gin.Engine {
@@ -54,6 +55,29 @@ func NewRouterWithDB(db *sql.DB, jwtSecret string, jwtExpiry time.Duration) *gin
 				clusterGroup.GET("/:id", clusterHandler.GetCluster)
 				clusterGroup.PUT("/:id", clusterHandler.UpdateCluster)
 				clusterGroup.DELETE("/:id", clusterHandler.DeleteCluster)
+			}
+
+			deployHandler := handlers.NewDeployHandler(
+				deploy.NewTemplateDB(db),
+				deploy.NewTaskDB(db),
+			)
+
+			templateGroup := v1.Group("/deploy/templates")
+			templateGroup.Use(middleware.AuthMiddleware(jwtSecret))
+			{
+				templateGroup.POST("", deployHandler.CreateTemplate)
+				templateGroup.GET("", deployHandler.ListTemplates)
+				templateGroup.GET("/:id", deployHandler.GetTemplate)
+				templateGroup.PUT("/:id", deployHandler.UpdateTemplate)
+				templateGroup.DELETE("/:id", deployHandler.DeleteTemplate)
+			}
+
+			taskGroup := v1.Group("/deploy/tasks")
+			taskGroup.Use(middleware.AuthMiddleware(jwtSecret))
+			{
+				taskGroup.POST("", deployHandler.CreateTask)
+				taskGroup.GET("", deployHandler.ListTasks)
+				taskGroup.GET("/:id", deployHandler.GetTask)
 			}
 		}
 	}
